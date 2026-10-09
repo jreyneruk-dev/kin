@@ -1,5 +1,7 @@
 # Kin — a private, collaborative family tree
 
+[![CI](https://github.com/jreyneruk-dev/kin/actions/workflows/ci.yml/badge.svg)](https://github.com/jreyneruk-dev/kin/actions/workflows/ci.yml)
+
 A login-only website for the **Macartney / Davies / Fahey** family to build one
 shared tree together. Seeded from michael's Ancestry research: the six children
 of William H Macartney & Edith Maude Grainger, including Kathleen S Macartney
@@ -69,6 +71,12 @@ npm run typecheck
 npm run e2e       # embedded Postgres + real HTTP: join→tree→profile→comment→fact→image→question→invite→logout
 ```
 
+CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs `npm ci`,
+`npm run typecheck` and `npm test` on every pull request and on every push to
+`main`; the badge above is its current state. If a pull request shows no
+checks, GitHub dropped the run rather than the repo skipping it — re-run from
+the Actions tab and don't merge blind.
+
 ## Deploy (free tier, ~10 minutes)
 
 1. **Supabase**: create a free project at supabase.com → copy the **session
@@ -78,7 +86,9 @@ npm run e2e       # embedded Postgres + real HTTP: join→tree→profile→comme
    makes pages hang indefinitely (this bit us in production — see the deploy
    notes below).
 2. **Vercel**: `npx vercel` from this folder (or push to GitHub and import,
-   root directory = `kin`). Set environment variables:
+   root directory = `kin`). The production project is wired to
+   `jreyneruk-dev/kin`, so a merge into `main` deploys itself; a manual
+   `vercel --prod` still works. Set environment variables:
    - `DATABASE_URL` — the Supabase pooled string
    - `OWNER_EMAIL` — your email (you become the owner when you join with it)
 3. **Apply the schema & seed** against the live database:
