@@ -145,6 +145,10 @@ match.
 
 ## 6. Next testable step, in order
 
+Tracked as a working checklist on the research hub (`/research`): one row per
+record below, each with a status and a note for what the read found
+(`checklist_items`, seeded by `npm run seed:checklist`).
+
 1. **Human read of the five candidate death registers** (links in §1): the
    occupation column separates farmer from labourer at a glance, and the
    place-of-death column gives the district's townland. One hit puts Henry on

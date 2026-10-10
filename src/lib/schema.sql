@@ -103,6 +103,25 @@ CREATE TABLE IF NOT EXISTS questions (
 );
 CREATE INDEX IF NOT EXISTS questions_status_idx ON questions (status);
 
+-- The junction checklist: the open records that stand between the family and
+-- a provable link to the documented Macartneys of Lissanoure. One row per
+-- record to read, seeded from src/lib/checklist-data.ts (key = idempotency
+-- key, so re-seeding refreshes the wording without touching status/note).
+-- A 'negative' status is a real result (searched, nothing found).
+CREATE TABLE IF NOT EXISTS checklist_items (
+  id         SERIAL PRIMARY KEY,
+  key        TEXT NOT NULL UNIQUE,
+  section    TEXT NOT NULL,
+  title      TEXT NOT NULL,
+  detail     TEXT NOT NULL DEFAULT '',
+  url        TEXT,
+  status     TEXT NOT NULL DEFAULT 'todo' CHECK (status IN ('todo', 'doing', 'found', 'negative', 'blocked')),
+  note       TEXT NOT NULL DEFAULT '',
+  updated_by TEXT,
+  updated_at BIGINT,
+  sort_order INTEGER NOT NULL DEFAULT 0
+);
+
 CREATE TABLE IF NOT EXISTS users (
   email           TEXT PRIMARY KEY,
   name            TEXT NOT NULL,

@@ -22,7 +22,11 @@ of William H Macartney & Edith Maude Grainger, including Kathleen S Macartney
   WikiTree deep links across all surname variants) and an "I found something"
   form that files a sourced fact in one step. FindMyPast's own terms forbid
   automated access, so the site links to searches and lets humans do the
-  judging — kin never scrapes it.
+  judging — kin never scrapes it. The **junction checklist** turns the open
+  records behind the Henry Macartney question into working rows — the five
+  death-register candidates, Griffith's Valuation, the 1870 Dublin bond and
+  the census — each with a status and a note for what the reading found
+  (seeded from `src/lib/checklist-data.ts`; re-seeding never clobbers a note).
 - **Backup tooling** — `npm run dump` snapshots every database table to JSON
   and `npm run restore` reloads it (with `--replace` as the crisis switch); a
   roundtrip script proves the pair. Pre-change snapshots live in `../backups/`.
@@ -50,6 +54,7 @@ npm install
 cp .env.example .env.local        # then edit DATABASE_URL + OWNER_EMAIL
 npm run schema                    # create tables
 npm run seed                      # load the transcribed tree + starter questions
+npm run seed:checklist            # the junction checklist (idempotent)
 npm run dev                       # http://localhost:3300
 ```
 
@@ -66,7 +71,7 @@ Sign in with your email + the password you chose at join. `OWNER_EMAIL` (in
 ## Tests & proof
 
 ```bash
-npm test          # 93 vitest tests: tree layout, auth, facts, GEDCOM, images, cluster isolation
+npm test          # 102 vitest tests: tree layout, auth, facts, GEDCOM, images, cluster isolation, the junction checklist
 npm run typecheck
 npm run e2e       # embedded Postgres + real HTTP: join→tree→profile→comment→fact→image→question→invite→logout
 ```
@@ -95,6 +100,7 @@ the Actions tab and don't merge blind.
    ```bash
    DATABASE_URL="<pooled string>" npm run schema
    DATABASE_URL="<pooled string>" npm run seed
+   DATABASE_URL="<pooled string>" npm run seed:checklist
    ```
 4. **Claim the site**: open `https://<your-app>.vercel.app/join`, create your
    first invite first (`DATABASE_URL=... npm run invite -- --note "john"`), and
@@ -180,7 +186,8 @@ one row of it reaching the tree.
 
 `people` · `unions` (couples) · `children` (union↔person) · `facts` (sourced
 events) · `comments` (person or union) · `questions` · `users` · `sessions` ·
-`invites` · `activity`. `people` and `unions` each carry `cluster`
+`invites` · `activity` · `checklist_items` (the junction checklist — wording
+re-seeded by key, recorded readings preserved). `people` and `unions` each carry `cluster`
 (default `family`). Schema: `src/lib/schema.sql`.
 
 ## Design notes

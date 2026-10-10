@@ -7,7 +7,17 @@
  */
 
 import postgres from "postgres";
-import type { Comment, Fact, Person, PersonImage, Question, SessionUser, Union } from "./types";
+import type {
+  ChecklistItem,
+  ChecklistStatus,
+  Comment,
+  Fact,
+  Person,
+  PersonImage,
+  Question,
+  SessionUser,
+  Union,
+} from "./types";
 import { deriveLiving } from "./facts";
 import { sessionUserFromRow } from "./auth";
 import { FAMILY_CLUSTER } from "./clusters";
@@ -643,6 +653,62 @@ export async function answerQuestion(id: number, now: number): Promise<void> {
 export async function reopenQuestion(id: number): Promise<void> {
   const db = getSql();
   await db`UPDATE questions SET status = 'open', answered_at = NULL WHERE id = ${id}`;
+}
+
+// ---- checklist (the junction's open records) ------------------------------------
+
+function checklistItemFromRow(r: Record<string, unknown>): ChecklistItem {
+  return {
+    id: Number(r.id),
+    key: String(r.key),
+    section: String(r.section),
+    title: String(r.title),
+    detail: String(r.detail),
+    url: r.url === null ? null : String(r.url),
+    status: String(r.status) as ChecklistStatus,
+    note: String(r.note),
+    sortOrder: Number(r.sort_order),
+    updatedBy: r.updated_by === null ? null : String(r.updated_by),
+    updatedAt: r.updated_at === null ? null : Number(r.updated_at),
+  };
+}
+
+/**
+ * Every checklist row, in the order the seed laid them out. Deliberately not
+ * cluster-scoped: the checklist spans the family tree and the documented
+ * Lissanoure line — the junction is the whole point of it.
+ */
+export async function checklistItems(): Promise<ChecklistItem[]> {
+  const db = getSql();
+  const rows = await db`
+    SELECT id, key, section, title, detail, url, status, note, sort_order, updated_by, updated_at
+    FROM checklist_items ORDER BY sort_order, id
+  `;
+  return rows.map(checklistItemFromRow);
+}
+
+/**
+ * Record a reading: the caller passes the complete status + note pair (the
+ * route merges a partial patch against the current row first), and the row is
+ * stamped with who did it and when. Returns null when the row is gone.
+ */
+export async function updateChecklistItem(
+  id: number,
+  patch: { status: ChecklistStatus; note: string },
+  actor: string,
+  now: number,
+): Promise<ChecklistItem | null> {
+  const db = getSql();
+  const rows = await db`
+    UPDATE checklist_items SET
+      status = ${patch.status},
+      note = ${patch.note},
+      updated_by = ${actor},
+      updated_at = ${now}
+    WHERE id = ${id}
+    RETURNING id, key, section, title, detail, url, status, note, sort_order, updated_by, updated_at
+  `;
+  return rows.length ? checklistItemFromRow(rows[0]) : null;
 }
 
 // ---- users / sessions / invites -------------------------------------------------

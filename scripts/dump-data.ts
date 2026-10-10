@@ -33,6 +33,7 @@ const TABLES = [
   "facts",
   "comments",
   "questions",
+  "checklist_items",
   "users",
   "sessions",
   "invites",

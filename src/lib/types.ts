@@ -95,6 +95,28 @@ export interface Question {
   answeredAt: number | null;
 }
 
+/** Working state of one junction-checklist record. */
+export type ChecklistStatus = "todo" | "doing" | "found" | "negative" | "blocked";
+
+/**
+ * One open record in the junction checklist (the Henry Macartney question):
+ * what to read, where it lives, who got to it, and what the reading found.
+ */
+export interface ChecklistItem {
+  id: number;
+  /** Stable seed key — the row keeps its identity across re-seeds. */
+  key: string;
+  section: string;
+  title: string;
+  detail: string;
+  url: string | null;
+  status: ChecklistStatus;
+  note: string;
+  sortOrder: number;
+  updatedBy: string | null;
+  updatedAt: number | null;
+}
+
 export interface SessionUser {
   email: string;
   name: string;

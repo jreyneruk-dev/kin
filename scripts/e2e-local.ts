@@ -11,6 +11,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import EmbeddedPostgres from "embedded-postgres";
+import postgres from "postgres";
 
 const PG_PORT = 5497;
 const APP_PORT = 3315;
@@ -28,6 +29,7 @@ function ok(cond: unknown, msg: string): void {
 const dataDir = mkdtempSync(join(tmpdir(), "kin-pg-"));
 let app: ChildProcess | null = null;
 let pg: InstanceType<typeof EmbeddedPostgres> | null = null;
+let dbClient: ReturnType<typeof postgres> | null = null;
 
 async function main() {
   pg = new EmbeddedPostgres({
@@ -42,6 +44,7 @@ async function main() {
   await pg.createDatabase("kin");
   process.env.DATABASE_URL = `postgres://postgres:password@localhost:${PG_PORT}/kin`;
   process.env.OWNER_EMAIL = "john@example.com";
+  dbClient = postgres(process.env.DATABASE_URL, { prepare: false, max: 1 });
   log(`[${++step}] embedded Postgres up on :${PG_PORT} (${dataDir})`);
 
   const schema = spawnSync("npx", ["tsx", "scripts/apply-schema.ts"], { encoding: "utf8" });
@@ -50,6 +53,15 @@ async function main() {
 
   const seed = spawnSync("npx", ["tsx", "scripts/seed.ts"], { encoding: "utf8" });
   ok(seed.stdout.includes("done."), `seed failed: ${seed.stderr}`);
+  const checklistSeed = spawnSync("npx", ["tsx", "scripts/seed-checklist.ts"], {
+    encoding: "utf8",
+    env: process.env,
+  });
+  ok(
+    checklistSeed.stdout.includes("checklist:"),
+    `checklist seed failed: ${checklistSeed.stderr}`,
+  );
+  log(`[${++step}] ${checklistSeed.stdout.split("\n")[0].trim()}`);
   log(`[${++step}] seed loaded (${seed.stdout.trim().split("\n").join(" · ")})`);
 
   // Serve the production build.
@@ -168,6 +180,38 @@ async function main() {
   ok(question.ok, `question failed: ${question.status}`);
   log(`[${++step}] question raised`);
 
+  // Junction checklist: the hub renders the records, a reading saves, and an
+  // anonymous write is refused.
+  const research = await fetch(`${APP}/research`, { headers: { cookie } });
+  ok(research.ok, `research hub failed: ${research.status}`);
+  const researchHtml = await research.text();
+  ok(researchHtml.includes("The junction checklist"), "checklist section missing from the hub");
+  ok(researchHtml.includes("Belfast, 1873"), "a death-register record is missing");
+  const itemRows = await dbClient!`SELECT id FROM checklist_items WHERE key = ${'death-1873-belfast'}`;
+  ok(itemRows.length === 1, "seeded checklist row not found");
+  const itemId = Number(itemRows[0].id);
+  const reading = "e2e reading: occupation labourer, not our farmer";
+  const saveItem = await fetch(`${APP}/api/checklist/${itemId}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json", cookie },
+    body: JSON.stringify({ status: "negative", note: reading }),
+  });
+  ok(saveItem.ok, `checklist save failed: ${saveItem.status}`);
+  const hubAfter = await (await fetch(`${APP}/research`, { headers: { cookie } })).text();
+  ok(hubAfter.includes(reading), "checklist note not rendered on the hub");
+  ok(
+    hubAfter.includes("1/8 junction records read"),
+    "hub progress not recomputed after a save",
+  );
+  ok(hubAfter.includes("last worked on by"), "checklist reading not attributed");
+  const anonSave = await fetch(`${APP}/api/checklist/${itemId}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ status: "todo", note: "" }),
+  });
+  ok(anonSave.status === 401, `anon checklist write not rejected: ${anonSave.status}`);
+  log(`[${++step}] junction checklist: hub renders, a reading saves, anon write 401s`);
+
   // Add a child of Kathleen (parent-of inverse: add child via child-of her union).
   const addPartner = await postJson(
     `${APP}/api/people`,
@@ -254,6 +298,7 @@ main()
   })
   .finally(async () => {
     if (app) app.kill();
+    if (dbClient) await dbClient.end().catch(() => {});
     if (pg) await pg.stop().catch(() => {});
     try {
       rmSync(dataDir, { recursive: true, force: true });

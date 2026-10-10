@@ -49,11 +49,16 @@ async function main() {
     console.error(seed.stderr);
     process.exit(1);
   }
+  const checklist = spawnSync("npx", ["tsx", "scripts/seed-checklist.ts"], { encoding: "utf8" });
+  if (!checklist.stdout.includes("checklist:")) {
+    console.error(checklist.stderr);
+    process.exit(1);
+  }
   // A ready-made invite so the first visitor can join immediately.
   const sql = postgres(process.env.DATABASE_URL, { prepare: false, max: 1 });
   await sql`INSERT INTO invites (code, note, created_by, created_at) VALUES (${"demo-demo"}, ${"demo invite"}, ${"demo"}, ${Date.now()})`;
   await sql.end();
-  console.log("demo: schema + seed + demo invite ready");
+  console.log("demo: schema + seed + checklist + demo invite ready");
 
   try {
     execSync(`lsof -ti tcp:${APP_PORT} | xargs kill -9`, { stdio: "ignore" });

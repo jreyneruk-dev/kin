@@ -40,13 +40,14 @@ export function Badge({
   tone = "stone",
 }: {
   children: React.ReactNode;
-  tone?: "stone" | "kin" | "amber" | "green";
+  tone?: "stone" | "kin" | "amber" | "green" | "rose";
 }) {
   const tones = {
     stone: "bg-stone-100 text-stone-700",
     kin: "bg-kin-light text-kin-dark",
     amber: "bg-amber-100 text-amber-800",
     green: "bg-emerald-100 text-emerald-800",
+    rose: "bg-rose-100 text-rose-800",
   } as const;
   return (
     <span className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-bold ${tones[tone]}`}>

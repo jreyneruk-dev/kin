@@ -1,13 +1,15 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getUser } from "@/lib/session";
-import { allFacts, allPeople, allQuestions } from "@/lib/db";
+import { allFacts, allPeople, allQuestions, checklistItems } from "@/lib/db";
 import { Badge, Card, SectionHeading } from "@/components/ui";
 import { surnameOf } from "@/lib/tree";
 import { researchPack, splitFullName, surnameCandidates } from "@/lib/research-links";
+import { checklistProgress } from "@/lib/checklist";
 import { QuestionList } from "../question-list";
 import { SearchPack } from "../search-pack";
 import { FindingsForm } from "../findings-form";
+import { JunctionChecklist } from "../junction-checklist";
 
 export const dynamic = "force-dynamic";
 
@@ -100,20 +102,29 @@ export default async function ResearchPage() {
   const user = await getUser();
   if (!user) redirect("/login");
 
-  const [questions, people, facts] = await Promise.all([
+  const [questions, people, facts, checklist] = await Promise.all([
     allQuestions(),
     allPeople(),
     allFacts(),
+    checklistItems(),
   ]);
 
   const withGaps = people.filter((p) => !p.birthDate || (!p.living && !p.deathDate) || !p.birthPlace);
   const branches = [...new Set(people.map((p) => surnameOf(p.fullName)))].sort();
   const sourcedFacts = facts.filter((f) => f.source).length;
+  const progress = checklistProgress(checklist);
+  const openQuestions = questions.filter((q) => q.status === "open").length;
+  const kicker = [
+    `${openQuestions} open questions`,
+    `${withGaps.length} people with gaps`,
+    `${sourcedFacts} sourced facts`,
+    ...(progress.total > 0 ? [`${progress.read}/${progress.total} junction records read`] : []),
+  ].join(" · ");
 
   return (
     <div className="wrap py-10">
       <SectionHeading
-        kicker={`${questions.filter((q) => q.status === "open").length} open questions · ${withGaps.length} people with gaps · ${sourcedFacts} sourced facts`}
+        kicker={kicker}
         title="Research hub"
         lede="Where the tree has holes, and exactly which records to look at next. Everything here is curated for this family — the questions, the gaps, and the surname background."
       />
@@ -174,6 +185,26 @@ export default async function ResearchPage() {
           </ul>
         </Card>
       </div>
+
+      {checklist.length > 0 && (
+        <section className="mt-12">
+          <h2 className="text-lg font-extrabold tracking-tight text-stone-900">
+            The junction checklist
+          </h2>
+          <p className="mt-1 max-w-3xl text-sm text-stone-600">
+            Henry Macartney — the “farmer” in the 1870 St Mark&apos;s marriage register — has no
+            place yet, and until he has one the question of a Lissanoure connection cannot be
+            tested. These are the records that can give him one: open a record, set its status,
+            and write down what the reading found.{" "}
+            <Link href="/lissanoure" className="font-semibold text-kin-dark underline">
+              See the documented line →
+            </Link>
+          </p>
+          <div className="mt-4">
+            <JunctionChecklist items={checklist} />
+          </div>
+        </section>
+      )}
 
       <section className="mt-12">
         <h2 className="text-lg font-extrabold tracking-tight text-stone-900">People with gaps</h2>

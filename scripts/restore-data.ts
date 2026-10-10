@@ -45,6 +45,7 @@ const TABLES = [
   "facts",
   "comments",
   "questions",
+  "checklist_items",
   "activity",
   "images",
   "image_blobs",
@@ -54,7 +55,16 @@ const TABLES = [
 // Tables with a SERIAL id column — the only ones needing identity resets and
 // sequence re-syncs (users/invites key on email/code; children/sessions and
 // image_blobs have no generated ids at all).
-const SERIAL_ID_TABLES = new Set(["people", "unions", "facts", "comments", "questions", "activity", "images"]);
+const SERIAL_ID_TABLES = new Set([
+  "people",
+  "unions",
+  "facts",
+  "comments",
+  "questions",
+  "checklist_items",
+  "activity",
+  "images",
+]);
 
 function encode(value: unknown, table: string, column: string): unknown {
   // postgres.js sends Buffer for bytea as-is; everything else passes through.
