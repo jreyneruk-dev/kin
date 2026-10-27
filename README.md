@@ -7,6 +7,10 @@ shared tree together. Seeded from michael's Ancestry research: the six children
 of William H Macartney & Edith Maude Grainger, including Kathleen S Macartney
 (John's maternal grandmother).
 
+**Research status:** where each family line stands, what has been tried, what is
+blocked and what to fetch next lives in [docs/STATUS.md](docs/STATUS.md) — read
+that first, on any machine.
+
 - **Private by default** — nothing renders without signing in; no public pages,
   no analytics. `noindex` site-wide.
 - **Click-to-grow tree** — add a parent, partner or child from any profile.
@@ -34,9 +38,10 @@ of William H Macartney & Edith Maude Grainger, including Kathleen S Macartney
 | Route | What it is |
 |---|---|
 | `/` | The tree, laid out by generation, with a branch filter, open questions and recent activity |
-| `/person/[id]` | Profile: facts & sources, image gallery, comments, questions, family links, add-a-relative |
+| `/person/[id]` | Profile: facts & sources, image gallery, comments, questions, family links, add-a-relative; Henry's record also carries the sourced candidate evidence and a link to `/compare` |
 | `/people` | Searchable index with "missing details" flags (each flag = a research to-do) |
 | `/lissanoure` | The research line's own tab: the documented Macartneys of Lissanoure, drawn from the `lissanoure` cluster alone (see Research clusters below) |
+| `/compare` | Both lines side by side, by date: the documented Lissanoure generations, our own, the four Henry candidates, and the reasons no record joins them |
 | `/research` | Curated hub: gaps to fill first, surname notes, record sets, all questions |
 | `/activity` | Full change log |
 | `/invites` | Owner-only: create and track invite codes |
@@ -66,9 +71,9 @@ Sign in with your email + the password you chose at join. `OWNER_EMAIL` (in
 ## Tests & proof
 
 ```bash
-npm test          # 93 vitest tests: tree layout, auth, facts, GEDCOM, images, cluster isolation
+npm test          # 118 vitest tests: tree layout, auth, facts, GEDCOM, images, cluster isolation, the two-line comparison, the evidence bridge
 npm run typecheck
-npm run e2e       # embedded Postgres + real HTTP: join→tree→profile→comment→fact→image→question→invite→logout
+npm run e2e       # embedded Postgres + real HTTP: join→tree→compare→Henry evidence→profile→comment→fact→image→question→invite→logout
 ```
 
 CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs `npm ci`,

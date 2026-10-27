@@ -8,3 +8,7 @@ tsconfig.tsbuildinfo
 next-env.d.ts
 *.log
 .vercel
+
+# Research scratch: downloaded PDFs, census API responses, image attempts.
+# Nothing here is a source — the sources are quoted in docs/.
+.research-tmp/
