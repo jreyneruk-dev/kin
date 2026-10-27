@@ -1,5 +1,45 @@
 /** Shared types for kin. */
 
+export type ResearchEvidenceStatus = "documented" | "pedigree" | "candidate" | "context";
+
+export interface ResearchEvidenceSource {
+  label: string;
+  url: string;
+}
+
+export interface HenryResearchCandidate {
+  key: string;
+  name: string;
+  record: string;
+  county: string;
+  parish: string;
+  townland: string;
+  setting: "rural" | "urban";
+  fit: "best" | "possible" | "weak";
+  note: string;
+  source: ResearchEvidenceSource;
+}
+
+export interface HenryResearchLineEntry {
+  key: string;
+  name: string;
+  dates: string;
+  place: string;
+  role: string;
+  evidence: ResearchEvidenceStatus;
+  note: string;
+  sources: ResearchEvidenceSource[];
+}
+
+export interface HenryResearchNextRecord {
+  record: string;
+  gives: string;
+  where: string;
+  url: string | null;
+}
+
+/** Shared types for kin. */
+
 export type Sex = "f" | "m" | "x";
 export type Confidence = "documented" | "likely" | "guess";
 /** Coarse provenance of a fact's source (Phase 1). */
@@ -16,6 +56,26 @@ export type FactKind =
   | "census"
   | "military"
   | "note";
+/** Sourced Macartney research attached to a specific person-tree record. */
+export interface PersonResearchEvidence {
+  key: "henry";
+  status: ResearchEvidenceStatus;
+  name: string;
+  dates: string;
+  place: string;
+  role: string;
+  summary: string;
+  verdict: string;
+  candidate: HenryResearchCandidate;
+  candidates: HenryResearchCandidate[];
+  titheGap: HenryResearchLineEntry;
+  hearthContext: HenryResearchLineEntry;
+  cromkillHouseholds: HenryResearchLineEntry;
+  nextRecord: HenryResearchNextRecord;
+  sources: ResearchEvidenceSource[];
+  compareHref: string;
+}
+
 export interface Person {
   id: number;
   fullName: string;
@@ -33,6 +93,8 @@ export interface Person {
   living: boolean;
   createdBy: string;
   createdAt: number;
+  /** Evidence stored on this person record; it never implies a family link. */
+  researchEvidence?: PersonResearchEvidence;
 }
 
 export interface Union {

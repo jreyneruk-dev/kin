@@ -11,6 +11,7 @@ import type { Comment, Fact, Person, PersonImage, Question, SessionUser, Union }
 import { deriveLiving } from "./facts";
 import { sessionUserFromRow } from "./auth";
 import { FAMILY_CLUSTER } from "./clusters";
+import { evidenceForLegacyHenryRow } from "./person-evidence";
 
 let sql: postgres.Sql | null = null;
 let poolBroken = false;
@@ -127,8 +128,38 @@ export async function closeDb(): Promise<void> {
 
 // ---- people ----------------------------------------------------------------
 
+/**
+ * `research_evidence` is a jsonb column, and postgres.js serialises a value
+ * bound next to a bare `::jsonb` cast itself. Binding an already-stringified
+ * object therefore stored a JSON *string*, which read back as text and made
+ * every `.key` lookup on it fail (writes now cast through `::text::jsonb`).
+ * Read both shapes so rows written by the earlier version still render.
+ */
+function parseResearchEvidence(value: unknown): Person["researchEvidence"] | undefined {
+  if (value === null || value === undefined) return undefined;
+  if (typeof value === "string") {
+    try {
+      const parsed: unknown = JSON.parse(value);
+      return parsed && typeof parsed === "object"
+        ? (parsed as Person["researchEvidence"])
+        : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+  return typeof value === "object" ? (value as Person["researchEvidence"]) : undefined;
+}
+
 function personFromRow(r: Record<string, unknown>): Person {
   const living = Boolean(r.living);
+  const personIdentity = {
+    id: Number(r.id),
+    fullName: String(r.full_name),
+    aliases: Array.isArray(r.aliases) ? r.aliases.map(String) : [],
+    cluster: String(r.cluster ?? FAMILY_CLUSTER),
+  };
+  const researchEvidence =
+    parseResearchEvidence(r.research_evidence) ?? evidenceForLegacyHenryRow(personIdentity);
   return {
     id: Number(r.id),
     fullName: String(r.full_name),
@@ -150,11 +181,12 @@ function personFromRow(r: Record<string, unknown>): Person {
     }),
     createdBy: String(r.created_by),
     createdAt: Number(r.created_at),
+    ...(researchEvidence ? { researchEvidence } : {}),
   };
 }
 
 const PERSON_COLS = `id, full_name, cluster, name_note, aliases, sex, birth_date, birth_place,
-  death_date, death_place, notes, living, created_by, created_at`;
+  death_date, death_place, notes, living, created_by, created_at, research_evidence`;
 
 /**
  * Every person in one cluster. Defaults to the family tree: a caller that
@@ -165,7 +197,7 @@ export async function allPeople(cluster: string = FAMILY_CLUSTER): Promise<Perso
   const db = getSql();
   const rows = await db`
     SELECT id, full_name, cluster, name_note, aliases, sex, birth_date, birth_place,
-           death_date, death_place, notes, living, created_by, created_at
+           death_date, death_place, notes, living, created_by, created_at, research_evidence
     FROM people WHERE cluster = ${cluster} ORDER BY id
   `;
   return rows.map(personFromRow);
@@ -177,7 +209,7 @@ export async function getPerson(id: number): Promise<Person | null> {
   const db = getSql();
   const rows = await db`
     SELECT id, full_name, cluster, name_note, aliases, sex, birth_date, birth_place,
-           death_date, death_place, notes, living, created_by, created_at
+           death_date, death_place, notes, living, created_by, created_at, research_evidence
     FROM people WHERE id = ${id}
   `;
   return rows.length ? personFromRow(rows[0]) : null;
@@ -209,11 +241,11 @@ export async function insertPerson(
 ): Promise<Person> {
   const db = getSql();
   const rows = await db`
-    INSERT INTO people (full_name, cluster, name_note, aliases, sex, birth_date, birth_place, death_date, death_place, notes, living, created_by, created_at)
+    INSERT INTO people (full_name, cluster, name_note, aliases, sex, birth_date, birth_place, death_date, death_place, notes, living, created_by, created_at, research_evidence)
     VALUES (${p.fullName}, ${cluster}, ${p.nameNote}, ${p.aliases ?? []}, ${p.sex}, ${p.birthDate}, ${p.birthPlace},
-            ${p.deathDate}, ${p.deathPlace}, ${p.notes}, ${p.living}, ${p.createdBy}, ${now})
+            ${p.deathDate}, ${p.deathPlace}, ${p.notes}, ${p.living}, ${p.createdBy}, ${now}, ${p.researchEvidence ? JSON.stringify(p.researchEvidence) : null}::text::jsonb)
     RETURNING id, full_name, cluster, name_note, aliases, sex, birth_date, birth_place,
-              death_date, death_place, notes, living, created_by, created_at
+              death_date, death_place, notes, living, created_by, created_at, research_evidence
   `;
   return personFromRow(rows[0]);
 }
@@ -256,11 +288,11 @@ export async function createPersonWithLink(
     }
 
     const rows = await t`
-      INSERT INTO people (full_name, cluster, name_note, aliases, sex, birth_date, birth_place, death_date, death_place, notes, living, created_by, created_at)
+      INSERT INTO people (full_name, cluster, name_note, aliases, sex, birth_date, birth_place, death_date, death_place, notes, living, created_by, created_at, research_evidence)
       VALUES (${p.fullName}, ${cluster}, ${p.nameNote}, ${p.aliases ?? []}, ${p.sex}, ${p.birthDate}, ${p.birthPlace},
-              ${p.deathDate}, ${p.deathPlace}, ${p.notes}, ${p.living}, ${p.createdBy}, ${now})
+              ${p.deathDate}, ${p.deathPlace}, ${p.notes}, ${p.living}, ${p.createdBy}, ${now}, ${p.researchEvidence ? JSON.stringify(p.researchEvidence) : null}::text::jsonb)
       RETURNING id, full_name, cluster, name_note, aliases, sex, birth_date, birth_place,
-                death_date, death_place, notes, living, created_by, created_at
+                death_date, death_place, notes, living, created_by, created_at, research_evidence
     `;
     const person = personFromRow(rows[0]);
     let unionId: number | null = null;
@@ -332,10 +364,11 @@ export async function updatePerson(id: number, p: Person): Promise<Person | null
       death_date = ${p.deathDate},
       death_place = ${p.deathPlace},
       notes = ${p.notes},
-      living = ${p.living}
+      living = ${p.living},
+      research_evidence = ${p.researchEvidence ? JSON.stringify(p.researchEvidence) : null}::text::jsonb
     WHERE id = ${id}
     RETURNING id, full_name, cluster, name_note, aliases, sex, birth_date, birth_place,
-              death_date, death_place, notes, living, created_by, created_at
+              death_date, death_place, notes, living, created_by, created_at, research_evidence
   `;
   return rows.length ? personFromRow(rows[0]) : null;
 }

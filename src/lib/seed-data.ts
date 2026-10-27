@@ -5,6 +5,7 @@
  */
 
 import type { Person } from "./types";
+import { henryEvidence } from "./person-evidence";
 
 export const SEED_SOURCE = "Ancestry tree screenshot (michael), Sep 2026";
 
@@ -14,7 +15,7 @@ type SeedPerson = Omit<Person, "id" | "createdAt" | "aliases" | "cluster"> & {
   aliases?: string[];
 };
 
-/** Birth year ordering: Eileen 1897, Richard 1898, Mabel 1900, Charles 1902, Ruby 1905. */
+/** Original siblings: Eileen 1897, Richard 1898, Mabel 1900, Charles 1902, Ruby 1905. Henry is a separate, unlinked research record. */
 export function seedPeople(): SeedPerson[] {
   return [
     {
@@ -164,6 +165,23 @@ export function seedPeople(): SeedPerson[] {
       living: false,
       createdBy: "seed",
     },
+    {
+      // The only surviving reference to Henry is his name and occupation in
+      // Richard Henry's 1870 marriage record. Keep every date/place unknown;
+      // evidence is attached to this person, but no parent or tree edge is.
+      fullName: "Henry Macartney",
+      nameNote: null,
+      aliases: [],
+      sex: "m",
+      birthDate: null,
+      birthPlace: null,
+      deathDate: null,
+      deathPlace: null,
+      notes: null,
+      living: false,
+      createdBy: "seed",
+      researchEvidence: henryEvidence(),
+    },
   ];
 }
 
@@ -181,6 +199,7 @@ export const SEED_INDEX = {
   charles: 9,
   ruby: 10,
   williamCumming: 11,
+  henry: 12,
 } as const;
 
 /** Unions as (partnerA index, partnerB index, note). */

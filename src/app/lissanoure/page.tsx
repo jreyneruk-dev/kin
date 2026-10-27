@@ -121,6 +121,15 @@ export default async function LissanourePage() {
             — the plain export stays the family tree.
           </p>
         )}
+        <p className="mt-3 text-sm">
+          <Link className="font-semibold text-kin-dark underline" href="/compare">
+            Compare the two lines side by side →
+          </Link>{" "}
+          <span className="text-stone-700">
+            every documented generation, the four Henry candidates, and the reasons no record
+            joins them.
+          </span>
+        </p>
       </div>
 
       <SectionHeading

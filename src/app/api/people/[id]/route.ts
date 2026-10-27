@@ -56,6 +56,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         deathPlace,
         living: body.living === undefined ? existing.living : Boolean(body.living),
       }),
+      researchEvidence: existing.researchEvidence,
     };
 
     const updated = await updatePerson(id, next);

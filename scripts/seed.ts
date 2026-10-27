@@ -50,10 +50,12 @@ try {
   // People
   const ids: number[] = [];
   for (const p of seedPeople()) {
+    // `::text::jsonb`, not `::jsonb`: a value bound next to a bare jsonb cast is
+    // serialised by postgres.js itself, which double-encodes it (see db.ts).
     const rows = await sql`
-      INSERT INTO people (full_name, name_note, aliases, sex, birth_date, birth_place, death_date, death_place, notes, living, created_by, created_at)
+      INSERT INTO people (full_name, name_note, aliases, sex, birth_date, birth_place, death_date, death_place, notes, living, created_by, created_at, research_evidence)
       VALUES (${p.fullName}, ${p.nameNote}, ${p.aliases ?? []}, ${p.sex}, ${p.birthDate}, ${p.birthPlace},
-              ${p.deathDate}, ${p.deathPlace}, ${p.notes}, ${p.living}, ${p.createdBy}, ${now})
+              ${p.deathDate}, ${p.deathPlace}, ${p.notes}, ${p.living}, ${p.createdBy}, ${now}, ${p.researchEvidence ? JSON.stringify(p.researchEvidence) : null}::text::jsonb)
       RETURNING id
     `;
     ids.push(Number(rows[0].id));

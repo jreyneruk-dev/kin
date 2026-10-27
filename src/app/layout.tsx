@@ -14,6 +14,7 @@ const nav = [
   { href: "/people", label: "People" },
   // A separate research line, deliberately its own tab: see src/lib/clusters.ts.
   { href: "/lissanoure", label: "Lissanoure" },
+  { href: "/compare", label: "Compare" },
   { href: "/research", label: "Research" },
   { href: "/activity", label: "Activity" },
 ];

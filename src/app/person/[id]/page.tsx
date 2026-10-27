@@ -14,8 +14,10 @@ import {
 } from "@/lib/db";
 import { Badge, Card, lifespan, PersonChip } from "@/components/ui";
 import { isFamilyCluster } from "@/lib/clusters";
+import { evidenceForPerson } from "@/lib/person-evidence";
 import type { Person } from "@/lib/types";
 import { FactsPanel } from "./facts-panel";
+import { HenryEvidencePanel } from "./henry-evidence";
 import { CommentForm } from "./comment-form";
 import { ImagesPanel } from "./images-panel";
 import { QuestionSection } from "./question-section";
@@ -32,6 +34,10 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
 
   const person = await getPerson(id);
   if (!person) notFound();
+
+  // Sourced research attached to this record. For Henry this is the candidate
+  // evidence behind /compare; it adds no parent and no date to the tree.
+  const evidence = evidenceForPerson(person);
 
   // Relatives come from the person's OWN cluster: a speculative profile must
   // never offer family-tree people as parents or partners, and vice versa.
@@ -102,6 +108,11 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
                 <Badge tone="green">LIVING</Badge>
               </span>
             )}
+            {evidence && (
+              <span className="ml-2">
+                <Badge tone="amber">{evidence.status.toUpperCase()} · NOT PROVEN</Badge>
+              </span>
+            )}
           </p>
           {person.aliases.length > 0 && (
             <p className="mt-1 text-sm text-stone-600">
@@ -119,6 +130,12 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
           Edit details
         </Link>
       </div>
+
+      {evidence && (
+        <div className="mt-8">
+          <HenryEvidencePanel evidence={evidence} />
+        </div>
+      )}
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_320px]">
         <div className="space-y-8">

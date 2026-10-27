@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS people (
   death_date   TEXT,
   death_place  TEXT,
   notes        TEXT,
+  research_evidence JSONB,
   living       BOOLEAN NOT NULL DEFAULT FALSE,
   created_by   TEXT NOT NULL,
   created_at   BIGINT NOT NULL
@@ -150,6 +151,9 @@ ALTER TABLE facts ADD COLUMN IF NOT EXISTS source_kind TEXT NOT NULL DEFAULT 'un
 -- Phase 1: name aliases (Eileen McCartney ↔ Macartney). Simple text array;
 -- search checks full_name and every alias.
 ALTER TABLE people ADD COLUMN IF NOT EXISTS aliases TEXT[] NOT NULL DEFAULT '{}';
+
+-- Sourced research attached directly to a person (never inferred as kinship).
+ALTER TABLE people ADD COLUMN IF NOT EXISTS research_evidence JSONB;
 
 -- Phase 3c: Alive tick box — new people default to alive; it goes clear as
 -- soon as a death is recorded (the API derives the flag), and can be

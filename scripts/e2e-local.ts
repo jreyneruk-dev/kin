@@ -29,7 +29,19 @@ const dataDir = mkdtempSync(join(tmpdir(), "kin-pg-"));
 let app: ChildProcess | null = null;
 let pg: InstanceType<typeof EmbeddedPostgres> | null = null;
 
+async function assertPortFree(): Promise<void> {
+  const inUse = await fetch(`${APP}/`)
+    .then(() => true)
+    .catch(() => false);
+  if (inUse) {
+    throw new Error(
+      `port ${APP_PORT} is already serving. A leaked server from an earlier run would make this proof read someone else's build — stop it and re-run.`,
+    );
+  }
+}
+
 async function main() {
+  await assertPortFree();
   pg = new EmbeddedPostgres({
     databaseDir: dataDir,
     user: "postgres",
@@ -54,14 +66,14 @@ async function main() {
 
   // Serve the production build.
   execSync("npx next build", { stdio: "inherit", env: process.env });
-  try {
-    execSync(`lsof -ti tcp:${APP_PORT} | xargs kill -9`, { stdio: "ignore" });
-  } catch {
-    // port already free
-  }
   app = spawn("node", ["node_modules/next/dist/bin/next", "start", "-p", String(APP_PORT)], {
     env: process.env,
     stdio: ["ignore", "ignore", "pipe"],
+    // Own process group: `next start` forks the real server, so killing the
+    // wrapper alone (as an earlier version did) leaves that child holding the
+    // port. The next run's server then fails to bind, the readiness check
+    // passes against the stale build, and the proof silently reads old code.
+    detached: true,
   });
   const appErr: string[] = [];
   app.stderr?.on("data", (d) => appErr.push(String(d)));
@@ -94,6 +106,64 @@ async function main() {
   ok(homeHtml.includes("Kathleen S Macartney"), "Kathleen missing from tree page");
   log(`[${++step}] tree page renders the seeded family`);
 
+  // Henry is a separate, unlinked person record: verify it in the complete
+  // people directory, not the connected-family tree visualization.
+  const directory = await fetch(`${APP}/people`, { headers: { cookie } });
+  ok(directory.ok, `people directory failed: ${directory.status}`);
+  const directoryHtml = await directory.text();
+  ok(directoryHtml.includes("Henry Macartney"), "seeded Henry missing from the people directory");
+  const henryId = scrapePersonId(directoryHtml, "Henry Macartney");
+  ok(henryId !== null, "Henry's seeded person profile link is missing");
+  log(`[${++step}] seeded unlinked Henry person record is present (person ${henryId})`);
+
+  // Comparison page: both sourced lines, the candidate, and the verdict —
+  // and it must stay behind the login like every other page.
+  const compare = await fetch(`${APP}/compare`, { headers: { cookie } });
+  if (!compare.ok) {
+    const body = await compare.text();
+    fail(`compare page failed: ${compare.status}; server stderr: ${appErr.join("")}; response: ${body.slice(0, 1000)}`);
+  }
+  const compareHtml = await compare.text();
+  ok(compareHtml.includes("Two Macartney lines, side by side"), "compare heading missing");
+  ok(compareHtml.includes("NOT LINKED"), "compare verdict missing");
+  ok(compareHtml.includes("Cromkill"), "Henry candidate missing from compare page");
+  ok(compareHtml.includes("1st Earl Macartney"), "Lissanoure line missing from compare page");
+  ok(
+    compareHtml.includes(`href="/person/${henryId}"`),
+    "compare page does not link back to Henry's profile",
+  );
+  ok(compareHtml.includes("Henry in the tree"), "compare page missing its Henry-in-the-tree link card");
+  ok(compareHtml.includes("No birth, marriage, death or place record survives"), "compare card does not use the person's attached evidence");
+  const anonCompare = await fetch(`${APP}/compare`, { redirect: "manual" });
+  ok(
+    anonCompare.status === 307 || anonCompare.status === 302,
+    `compare page not auth-gated: ${anonCompare.status}`,
+  );
+  log(`[${++step}] compare page renders both lines and is auth-gated`);
+
+  // Henry's own profile: the candidate evidence from the comparison data is
+  // attached to the tree record, and it links back into the side-by-side view.
+  const henryProfile = await fetch(`${APP}/person/${henryId}`, { headers: { cookie } });
+  ok(henryProfile.ok, `Henry profile failed: ${henryProfile.status}`);
+  const henryHtml = await henryProfile.text();
+  ok(henryHtml.includes("Candidate — not a proven ancestor"), "Henry evidence heading missing");
+  ok(henryHtml.includes("Cromkill"), "Henry evidence missing the Cromkill candidate");
+  ok(henryHtml.includes("1835"), "Henry evidence missing the 1835 tithe gap");
+  ok(henryHtml.includes("1669"), "Henry evidence missing the 1669 hearth-roll context");
+  ok(henryHtml.includes("All four Henrys"), "Henry evidence missing the four-candidate set");
+  ok(henryHtml.includes("Hugh"), "Henry evidence missing the Cromkill cluster names");
+  ok(henryHtml.includes("No parent is recorded"), "Henry evidence missing the no-parent warning");
+  ok(
+    henryHtml.includes('href="/compare#comparison-heading"'),
+    "Henry profile does not link to the comparison",
+  );
+  ok(henryHtml.includes("PRONI"), "Henry evidence missing the record that would break the wall");
+  ok(henryHtml.includes("fl. 1861–1870 (born c.1810–1820?)"), "Henry profile changed the ledger's candidate dates");
+  ok(henryHtml.includes("No birth, marriage, death or place record survives"), "Henry profile did not read the seeded summary");
+  log(
+    `[${++step}] Henry's profile shows the seeded candidate evidence; compare link resolves both ways (person ${henryId})`,
+  );
+
   // Find Kathleen's profile id from the people API? No people API (by design);
   // scrape it from the tree page HTML links.
   const kathleenId = scrapePersonId(homeHtml, "Kathleen S Macartney");
@@ -103,6 +173,23 @@ async function main() {
   const profileHtml = await profile.text();
   ok(profileHtml.includes("Aylwin P Davies"), "family sidebar missing Aylwin");
   log(`[${++step}] Kathleen's profile renders family links`);
+
+  // Ordinary edits to a person must preserve its researchEvidence payload.
+  const henryEdit = await fetch(`${APP}/api/people/${henryId}`, {
+    method: "PATCH",
+    headers: { cookie, "content-type": "application/json" },
+    body: JSON.stringify({ nameNote: "e2e: preserve evidence metadata" }),
+  });
+  ok(henryEdit.ok, `Henry edit failed: ${henryEdit.status}`);
+  const editedHenry = await (await fetch(`${APP}/person/${henryId}`, { headers: { cookie } })).text();
+  ok(editedHenry.includes("Cromkill"), "Henry edit dropped the attached research evidence");
+  ok(editedHenry.includes('href="/compare#comparison-heading"'), "Henry edit dropped the comparison cross-link");
+  const compareAfterEdit = await (
+    await fetch(`${APP}/compare`, { headers: { cookie } })
+  ).text();
+  ok(compareAfterEdit.includes("No birth, marriage, death or place record survives"), "Henry edit dropped the attached evidence from compare");
+  ok(compareAfterEdit.includes(`href="/person/${henryId}"`), "compare lost its link to Henry after his edit");
+  log(`[${++step}] Henry's profile and compare retain attached evidence after an ordinary edit`);
 
   // Comment on Kathleen.
   const comment = await postJson(
@@ -253,7 +340,13 @@ main()
     process.exit(1);
   })
   .finally(async () => {
-    if (app) app.kill();
+    if (app?.pid) {
+      try {
+        process.kill(-app.pid, "SIGTERM"); // the whole group, not just the wrapper
+      } catch {
+        // already gone
+      }
+    }
     if (pg) await pg.stop().catch(() => {});
     try {
       rmSync(dataDir, { recursive: true, force: true });
